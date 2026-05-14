@@ -3,6 +3,15 @@
     <SavedNumbers />
     <NumberInput />
 
+    <div class="period-selector">
+      <label>选择期数:</label>
+      <select v-model="selectedPeriod" @change="handlePeriodChange">
+        <option v-for="p in periods" :key="p.period" :value="p">
+          第 {{ p.period }} 期（{{ p.date }}）
+        </option>
+      </select>
+    </div>
+
     <div class="actions">
       <button
         class="btn-submit"
@@ -31,7 +40,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { onMounted } from 'vue'
 import NumberInput from '../components/NumberInput.vue'
 import SavedNumbers from '../components/SavedNumbers.vue'
 import ResultDisplay from '../components/ResultDisplay.vue'
@@ -46,7 +55,15 @@ const userStore = useUserStore()
 
 const { isLoggedIn } = storeToRefs(userStore)
 const { currentNumbers, isFormValid } = numbersStore
-const { isLoading, error: resultError, compareResults } = storeToRefs(resultStore)
+const { periods, selectedPeriod, isLoading, error: resultError } = storeToRefs(resultStore)
+
+onMounted(async () => {
+  await resultStore.fetchPeriods()
+})
+
+function handlePeriodChange() {
+  resultStore.reset()
+}
 
 async function handleSubmit() {
   if (!isFormValid()) return
@@ -69,6 +86,40 @@ async function handleSave() {
 .home {
   max-width: 1000px;
   margin: 0 auto;
+}
+
+.period-selector {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  background: white;
+  padding: 12px 16px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+.period-selector label {
+  font-weight: bold;
+  color: #333;
+  white-space: nowrap;
+}
+
+.period-selector select {
+  flex: 1;
+  max-width: 300px;
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+  background: #f8f9fa;
+  cursor: pointer;
+}
+
+.period-selector select:focus {
+  outline: none;
+  border-color: #e53935;
+  background: white;
 }
 
 .actions {

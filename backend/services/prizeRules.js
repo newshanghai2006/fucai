@@ -9,6 +9,7 @@ const PRIZE_RULES = [
   { level: 6, name: '六等奖', redMatch: 2, blueMatch: 1, prize: 5, note: '' },
   { level: 6, name: '六等奖', redMatch: 1, blueMatch: 1, prize: 5, note: '' },
   { level: 6, name: '六等奖', redMatch: 0, blueMatch: 1, prize: 5, note: '' },
+  { level: 7, name: '福运奖', redMatch: 3, blueMatch: 0, prize: 5, note: '' },
 ];
 
 function checkPrize(userRed, userBlue, drawRed, drawBlue) {

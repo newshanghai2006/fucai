@@ -4,6 +4,7 @@ import { lotteryApi } from '../api'
 
 export const useResultStore = defineStore('result', () => {
   const periods = ref([])
+  const selectedPeriod = ref(null)
   const compareResults = ref([])
   const isLoading = ref(false)
   const error = ref('')
@@ -12,12 +13,10 @@ export const useResultStore = defineStore('result', () => {
     let totalWinCount = 0
     let totalPrize = 0
 
-    for (const group of compareResults.value) {
-      for (const period of group.periods) {
-        if (period.won) {
-          totalWinCount++
-          totalPrize += period.prize
-        }
+    for (const result of compareResults.value) {
+      if (result.won) {
+        totalWinCount++
+        totalPrize += result.prize
       }
     }
 
@@ -27,35 +26,47 @@ export const useResultStore = defineStore('result', () => {
   async function fetchPeriods() {
     const { data } = await lotteryApi.getRecent(20)
     periods.value = data.periods
+    if (data.periods.length > 0 && !selectedPeriod.value) {
+      selectedPeriod.value = data.periods[0]
+    }
     return data.periods
   }
 
   async function submitCompare(numbers) {
+    if (!selectedPeriod.value) {
+      error.value = '请先选择期数'
+      return
+    }
+
     isLoading.value = true
     error.value = ''
     compareResults.value = []
 
     try {
       const p = periods.value.length > 0 ? periods.value : await fetchPeriods()
+      const period = p.find(pp => pp.period === selectedPeriod.value.period)
+      if (!period) {
+        error.value = '选中的期数不存在'
+        return
+      }
 
-      compareResults.value = numbers.map(numberGroup => ({
-        red: numberGroup.red,
-        blue: numberGroup.blue,
-        periods: p.map(period => {
-          const redMatch = numberGroup.red.filter(n => period.red.includes(n)).length
-          const blueMatch = numberGroup.blue === period.blue ? 1 : 0
+      compareResults.value = numbers.map(numberGroup => {
+        const redMatch = numberGroup.red.filter(n => period.red.includes(n)).length
+        const blueMatch = numberGroup.blue === period.blue ? 1 : 0
+        const prize = getPrize(redMatch, blueMatch)
 
-          const prize = getPrize(redMatch, blueMatch)
-
-          return {
-            period: period.period,
-            drawDate: period.date,
-            drawRed: period.red,
-            drawBlue: period.blue,
-            ...prize,
-          }
-        }),
-      }))
+        return {
+          red: numberGroup.red,
+          blue: numberGroup.blue,
+          period: period.period,
+          drawDate: period.date,
+          drawRed: period.red,
+          drawBlue: period.blue,
+          redMatch,
+          blueMatch,
+          ...prize,
+        }
+      })
     } catch (err) {
       error.value = '开奖数据获取失败，请稍后重试'
       console.error(err)
@@ -76,6 +87,7 @@ export const useResultStore = defineStore('result', () => {
       { level: 6, name: '六等奖', r: 2, b: 1, prize: 5, note: '' },
       { level: 6, name: '六等奖', r: 1, b: 1, prize: 5, note: '' },
       { level: 6, name: '六等奖', r: 0, b: 1, prize: 5, note: '' },
+      { level: 7, name: '福运奖', r: 3, b: 0, prize: 5, note: '' },
     ]
 
     for (const rule of rules) {
@@ -94,6 +106,7 @@ export const useResultStore = defineStore('result', () => {
 
   return {
     periods,
+    selectedPeriod,
     compareResults,
     isLoading,
     error,
