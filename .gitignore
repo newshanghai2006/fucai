@@ -170,7 +170,13 @@
 *.gz
 *.bz2
 *.xz
-*.Z
 *.lz
 *.lzma
 *.iso
+
+# SQLite
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
