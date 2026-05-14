@@ -22,22 +22,32 @@
       <div class="section-title">开奖号码</div>
       <div class="draw-number-row">
         <div class="number-field">
-          <label>红球：</label>
-          <input
-            type="text"
-            v-model="drawRedInput"
-            :disabled="!useCustomDraw"
-            placeholder="如：09 14 15 16 29 30"
-          />
+          <label>红球</label>
+          <div class="ball-inputs">
+            <input
+              v-for="i in 6"
+              :key="'red-' + i"
+              type="text"
+              maxlength="2"
+              :value="parsedDrawRed[i - 1] || ''"
+              @input="onDrawRedInput(i - 1, $event.target.value)"
+              :disabled="!useCustomDraw"
+              class="ball-input red"
+            />
+          </div>
         </div>
-        <div class="number-field small">
-          <label>蓝球：</label>
-          <input
-            type="text"
-            v-model="drawBlueInput"
-            :disabled="!useCustomDraw"
-            placeholder="如：10"
-          />
+        <div class="number-field blue-field">
+          <label>蓝球</label>
+          <div class="ball-inputs single">
+            <input
+              type="text"
+              maxlength="2"
+              :value="parsedDrawBlue || ''"
+              @input="onDrawBlueInput($event.target.value)"
+              :disabled="!useCustomDraw"
+              class="ball-input blue"
+            />
+          </div>
         </div>
       </div>
     </div>
@@ -46,18 +56,25 @@
       <div class="section-title">5组自选号（自动保存）</div>
       <div v-for="(group, i) in groups" :key="i" class="group-row">
         <span class="group-label">第{{ i + 1 }}组：</span>
-        <input
-          type="text"
-          v-model="group.red"
-          placeholder="红球，用空格或逗号分隔"
-        />
-        <span class="blue-label">蓝：</span>
-        <input
-          type="text"
-          v-model="group.blue"
-          class="blue-input"
-          placeholder="蓝球"
-        />
+        <div class="group-inputs">
+          <input
+            v-for="j in 6"
+            :key="j"
+            type="text"
+            maxlength="2"
+            :value="parsedGroup(i, j - 1)"
+            @input="onGroupRedInput(i, j - 1, $event.target.value)"
+            class="ball-input red"
+          />
+          <span class="plus-sign">+</span>
+          <input
+            type="text"
+            maxlength="2"
+            :value="parsedGroupBlue(i)"
+            @input="onGroupBlueInput(i, $event.target.value)"
+            class="ball-input blue"
+          />
+        </div>
       </div>
     </div>
 
@@ -73,6 +90,7 @@
         :disabled="!hasValidInput || isLoading"
         @click="handleSubmit"
       >
+        <span class="btn-icon">✓</span>
         {{ isLoading ? '核对中...' : '提交核对' }}
       </button>
     </div>
@@ -90,13 +108,23 @@ import { storeToRefs } from 'pinia'
 
 const numbersStore = useNumbersStore()
 const resultStore = useResultStore()
-const { groups, isFormValid } = numbersStore
-const { periods, selectedPeriod, compareResults, isLoading, error } = storeToRefs(resultStore)
+const { groups } = numbersStore
+const { periods, selectedPeriod, isLoading } = storeToRefs(resultStore)
 
 const useCustomDraw = ref(false)
-const drawRedInput = ref('')
-const drawBlueInput = ref('')
+const drawRawInput = ref('')
+const drawBlueRawInput = ref('')
 const validationErrors = ref([])
+
+const parsedDrawRed = computed(() => {
+  if (!drawRawInput.value) return [null, null, null, null, null, null]
+  return drawRawInput.value.split(/[\s,，]+/).map(s => parseInt(s.trim())).filter(n => !isNaN(n))
+})
+
+const parsedDrawBlue = computed(() => {
+  const n = parseInt(drawBlueRawInput.value)
+  return isNaN(n) ? null : n
+})
 
 const hasValidInput = computed(() => {
   const { validCount, errors } = numbersStore.validateAll()
@@ -110,25 +138,72 @@ onMounted(async () => {
 
 watch(selectedPeriod, (newVal) => {
   if (newVal && !useCustomDraw.value) {
-    drawRedInput.value = newVal.red.join(' ')
-    drawBlueInput.value = String(newVal.blue)
+    drawRawInput.value = newVal.red.join(' ')
+    drawBlueRawInput.value = String(newVal.blue)
   }
 }, { immediate: true })
 
 function onPeriodChange() {
   resultStore.reset()
   if (!useCustomDraw.value && selectedPeriod.value) {
-    drawRedInput.value = selectedPeriod.value.red.join(' ')
-    drawBlueInput.value = String(selectedPeriod.value.blue)
+    drawRawInput.value = selectedPeriod.value.red.join(' ')
+    drawBlueRawInput.value = String(selectedPeriod.value.blue)
   }
 }
 
+function onDrawRedInput(index, value) {
+  const cleaned = value.replace(/[^\d]/g, '')
+  const parts = drawRawInput.value.split(/[\s,，]+/).filter(s => s)
+  parts[index] = cleaned
+  drawRawInput.value = parts.join(' ')
+
+  if (cleaned.length === 2) {
+    const inputs = document.querySelectorAll('.draw-number-row .ball-input.red')
+    if (inputs[index + 1]) inputs[index + 1].focus()
+  }
+}
+
+function onDrawBlueInput(value) {
+  drawBlueRawInput.value = value.replace(/[^\d]/g, '')
+}
+
+function parseGroupInput(index) {
+  const g = groups.value[index]
+  return g.red.split(/[\s,，]+/).map(s => parseInt(s.trim())).filter(n => !isNaN(n))
+}
+
+function parsedGroup(groupIndex, ballIndex) {
+  const parts = parseGroupInput(groupIndex)
+  return parts[ballIndex] ? String(parts[ballIndex]) : ''
+}
+
+function parsedGroupBlue(groupIndex) {
+  const n = parseInt(groups.value[groupIndex].blue)
+  return isNaN(n) ? '' : String(n)
+}
+
+function onGroupRedInput(groupIndex, ballIndex, value) {
+  const cleaned = value.replace(/[^\d]/g, '')
+  const parts = groups.value[groupIndex].red.split(/[\s,，]+/).filter(s => s)
+  parts[ballIndex] = cleaned
+  groups.value[groupIndex].red = parts.join(' ')
+
+  if (cleaned.length === 2) {
+    const row = document.querySelectorAll(`.group-row`)[groupIndex]
+    if (row) {
+      const inputs = row.querySelectorAll('.ball-input.red')
+      if (inputs[ballIndex + 1]) inputs[ballIndex + 1].focus()
+    }
+  }
+}
+
+function onGroupBlueInput(groupIndex, value) {
+  groups.value[groupIndex].blue = value.replace(/[^\d]/g, '')
+}
+
 function parseDrawNumbers() {
-  const reds = drawRedInput.value
-    .split(/[\s,，]+/)
-    .map(s => parseInt(s.trim()))
-    .filter(n => !isNaN(n))
-  const blue = parseInt(drawBlueInput.value)
+  const reds = drawRawInput.value.split(/[\s,，]+/).map(s => parseInt(s.trim())).filter(n => !isNaN(n))
+  const blue = parseInt(drawBlueRawInput.value)
   return { red: reds, blue: isNaN(blue) ? 0 : blue }
 }
 
@@ -146,56 +221,80 @@ async function handleSubmit() {
 
 <style scoped>
 .home {
-  max-width: 700px;
+  max-width: 680px;
   margin: 0 auto;
-  padding: 20px 16px;
+  padding: 24px 16px;
 }
 
 .page-title {
   text-align: center;
-  font-size: 24px;
-  color: #e53935;
-  margin-bottom: 24px;
+  font-size: 26px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #e53935 0%, #c62828 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 28px;
 }
 
 .section {
   background: white;
-  border-radius: 8px;
-  padding: 16px;
+  border-radius: 12px;
+  padding: 20px;
   margin-bottom: 16px;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  border: 1px solid #f0f0f0;
 }
 
 .checkbox-label {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 14px;
+  gap: 10px;
+  font-size: 15px;
   color: #333;
   cursor: pointer;
+  font-weight: 500;
 }
 
 .checkbox-label input {
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   accent-color: #e53935;
+  cursor: pointer;
 }
 
 .section-title {
-  font-size: 15px;
-  font-weight: bold;
+  font-size: 16px;
+  font-weight: 600;
   color: #333;
-  margin-bottom: 12px;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.section-title::before {
+  content: '';
+  display: inline-block;
+  width: 4px;
+  height: 18px;
+  background: linear-gradient(180deg, #e53935, #ff6b6b);
+  border-radius: 2px;
 }
 
 select {
   width: 100%;
-  padding: 10px 12px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  font-size: 14px;
-  background: #f8f9fa;
+  padding: 12px 16px;
+  border: 2px solid #eee;
+  border-radius: 8px;
+  font-size: 15px;
+  background: #fafafa;
   cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+select:hover {
+  border-color: #ddd;
 }
 
 select:focus {
@@ -206,104 +305,130 @@ select:focus {
 
 .draw-number-row {
   display: flex;
-  gap: 16px;
+  gap: 20px;
   align-items: flex-end;
 }
 
 .number-field {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 10px;
   flex: 1;
 }
 
-.number-field.small {
-  flex: 0 0 120px;
+.number-field.blue-field {
+  flex: 0 0 auto;
 }
 
 .number-field label {
   font-size: 14px;
-  color: #666;
+  color: #888;
+  font-weight: 500;
 }
 
-.number-field input {
-  padding: 10px 12px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  font-size: 14px;
-  font-family: 'Courier New', monospace;
-  letter-spacing: 1px;
+.ball-inputs {
+  display: flex;
+  gap: 8px;
 }
 
-.number-field input:focus {
+.ball-inputs.single {
+  justify-content: center;
+}
+
+.ball-input {
+  width: 44px;
+  height: 44px;
+  text-align: center;
+  font-size: 18px;
+  font-weight: 700;
+  border: 2px solid #eee;
+  border-radius: 50%;
   outline: none;
-  border-color: #e53935;
-  background: #fff;
+  transition: all 0.2s;
+  font-family: 'Courier New', monospace;
 }
 
-.number-field input:disabled {
+.ball-input.red:focus {
+  border-color: #e53935;
+  box-shadow: 0 0 0 3px rgba(229, 57, 53, 0.15);
+  color: #e53935;
+}
+
+.ball-input.red:not(:disabled):not(:focus) {
+  border-color: #ffcdd2;
+  background: #fff5f5;
+  color: #e53935;
+}
+
+.ball-input.blue:focus {
+  border-color: #1976d2;
+  box-shadow: 0 0 0 3px rgba(25, 118, 210, 0.15);
+  color: #1976d2;
+}
+
+.ball-input.blue:not(:disabled):not(:focus) {
+  border-color: #bbdefb;
+  background: #f3f8ff;
+  color: #1976d2;
+}
+
+.ball-input:disabled {
   background: #f5f5f5;
-  color: #666;
+  color: #999;
   cursor: not-allowed;
+  border-color: #eee;
 }
 
 .group-row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 10px;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid #f5f5f5;
 }
 
 .group-row:last-child {
-  margin-bottom: 0;
+  border-bottom: none;
+  padding-bottom: 0;
 }
 
 .group-label {
   font-size: 14px;
-  color: #666;
+  color: #888;
   white-space: nowrap;
+  font-weight: 500;
   min-width: 56px;
 }
 
-.group-row input[type="text"] {
+.group-inputs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   flex: 1;
-  padding: 8px 10px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  font-size: 14px;
-  font-family: 'Courier New', monospace;
-  letter-spacing: 1px;
 }
 
-.group-row input[type="text"]:focus {
-  outline: none;
-  border-color: #e53935;
-  background: #fff;
-}
-
-.blue-label {
-  font-size: 14px;
-  color: #666;
-  white-space: nowrap;
-}
-
-.blue-input {
-  width: 80px !important;
-  flex: 0 0 80px !important;
-  text-align: center;
+.plus-sign {
+  font-size: 20px;
+  color: #ccc;
+  margin: 0 4px;
+  font-weight: 300;
 }
 
 .error-section {
-  background: #ffebee;
-  border-radius: 6px;
-  padding: 12px 16px;
-  margin-bottom: 16px;
+  background: linear-gradient(135deg, #fff5f5 0%, #ffebee 100%);
+  border-radius: 10px;
+  padding: 14px 18px;
+  margin-bottom: 20px;
+  border: 1px solid #ffcdd2;
 }
 
 .error-line {
   color: #e53935;
   font-size: 13px;
   margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .error-line:last-child {
@@ -313,59 +438,77 @@ select:focus {
 .btn-wrapper {
   display: flex;
   justify-content: center;
-  margin: 24px 0;
+  margin: 28px 0;
 }
 
 .btn-submit {
-  padding: 12px 48px;
-  background: #4caf50;
+  padding: 14px 56px;
+  background: linear-gradient(135deg, #4caf50 0%, #388e3c 100%);
   border: none;
-  border-radius: 6px;
+  border-radius: 8px;
   color: white;
-  font-size: 16px;
-  font-weight: bold;
+  font-size: 17px;
+  font-weight: 600;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: all 0.2s;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
 }
 
-.btn-submit::before {
-  content: '\2713';
-  font-size: 18px;
+.btn-icon {
+  font-size: 20px;
+  font-weight: 700;
 }
 
 .btn-submit:disabled {
-  background: #a5d6a7;
+  background: linear-gradient(135deg, #a5d6a7 0%, #81c784 100%);
   cursor: not-allowed;
+  box-shadow: none;
 }
 
 .btn-submit:not(:disabled):hover {
-  background: #43a047;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(76, 175, 80, 0.35);
+}
+
+.btn-submit:not(:disabled):active {
+  transform: translateY(0);
 }
 
 @media (max-width: 600px) {
-  .draw-number-row {
-    flex-direction: column;
-    gap: 10px;
+  .home {
+    padding: 16px 12px;
   }
 
-  .number-field.small {
-    flex: 1;
+  .draw-number-row {
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .number-field.blue-field {
+    align-self: center;
   }
 
   .group-row {
     flex-wrap: wrap;
+    gap: 8px;
   }
 
   .group-label {
     min-width: auto;
   }
 
-  .blue-input {
-    width: 60px !important;
-    flex: 0 0 60px !important;
+  .group-inputs {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .ball-input {
+    width: 38px;
+    height: 38px;
+    font-size: 16px;
   }
 }
 </style>

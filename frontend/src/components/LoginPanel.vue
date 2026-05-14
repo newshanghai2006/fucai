@@ -8,12 +8,18 @@
       </div>
     </template>
     <template v-else-if="loginStatus === 'idle'">
-      <button class="btn-login" @click="handleLogin">微信扫码登录</button>
+      <button class="btn-login" @click="handleLogin">
+        <svg class="login-icon" viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+        </svg>
+        微信登录
+      </button>
     </template>
     <template v-else-if="loginStatus === 'pending' || loginStatus === 'scanned'">
       <div class="qrcode-popover" v-if="showQR">
         <div class="qrcode-backdrop" @click="showQR = false"></div>
         <div class="qrcode-content">
+          <h3>微信扫码登录</h3>
           <img :src="qrcodeUrl" alt="扫码登录" class="qrcode" />
           <p class="qrcode-hint">
             {{ loginStatus === 'pending' ? '请使用微信扫码' : '已扫码，请确认登录' }}
@@ -21,10 +27,10 @@
           <button class="btn-close" @click="showQR = false">关闭</button>
         </div>
       </div>
-      <button class="btn-login" @click="showQR = true">登录中...</button>
+      <button class="btn-login active" @click="showQR = true">登录中...</button>
     </template>
     <template v-else-if="loginStatus === 'expired'">
-      <button class="btn-login" @click="handleLogin">重新获取</button>
+      <button class="btn-login" @click="handleLogin">二维码过期，重新获取</button>
     </template>
   </div>
 </template>
@@ -55,50 +61,64 @@ async function handleLogout() {
 }
 
 .btn-login {
-  padding: 6px 14px;
-  background: #f5f5f5;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  color: #666;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: rgba(255,255,255,0.2);
+  border: 1px solid rgba(255,255,255,0.4);
+  border-radius: 6px;
+  color: white;
   cursor: pointer;
-  font-size: 13px;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s;
 }
 
 .btn-login:hover {
-  background: #eee;
+  background: rgba(255,255,255,0.3);
+}
+
+.btn-login.active {
+  background: rgba(255,255,255,0.3);
+}
+
+.login-icon {
+  opacity: 0.9;
 }
 
 .user-info {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
 .avatar {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
-  background: #f5f5f5;
+  border: 2px solid rgba(255,255,255,0.5);
 }
 
 .nickname {
-  font-size: 13px;
-  color: #666;
+  font-size: 14px;
+  color: rgba(255,255,255,0.95);
+  font-weight: 500;
 }
 
 .btn-logout {
-  padding: 4px 10px;
-  background: none;
-  border: 1px solid #ddd;
+  padding: 5px 12px;
+  background: rgba(255,255,255,0.15);
+  border: 1px solid rgba(255,255,255,0.3);
   border-radius: 4px;
-  color: #999;
+  color: rgba(255,255,255,0.8);
   cursor: pointer;
   font-size: 12px;
+  transition: all 0.2s;
 }
 
 .btn-logout:hover {
-  border-color: #e53935;
-  color: #e53935;
+  background: rgba(255,255,255,0.25);
 }
 
 .qrcode-popover {
@@ -116,7 +136,7 @@ async function handleLogout() {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0,0,0,0.4);
+  background: rgba(0,0,0,0.5);
 }
 
 .qrcode-content {
@@ -125,30 +145,39 @@ async function handleLogout() {
   left: 50%;
   transform: translate(-50%, -50%);
   background: white;
-  padding: 24px;
-  border-radius: 12px;
+  padding: 32px;
+  border-radius: 16px;
   text-align: center;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.2);
+}
+
+.qrcode-content h3 {
+  margin: 0 0 20px;
+  font-size: 18px;
+  color: #333;
 }
 
 .qrcode {
-  width: 180px;
-  height: 180px;
+  width: 200px;
+  height: 200px;
+  border-radius: 8px;
 }
 
 .qrcode-hint {
-  margin: 12px 0;
+  margin: 16px 0;
   font-size: 14px;
-  color: #666;
+  color: #888;
 }
 
 .btn-close {
-  padding: 6px 20px;
+  padding: 8px 24px;
   background: #f5f5f5;
   border: none;
-  border-radius: 4px;
+  border-radius: 6px;
   cursor: pointer;
-  font-size: 13px;
+  font-size: 14px;
+  color: #666;
+  transition: background 0.2s;
 }
 
 .btn-close:hover {
