@@ -11,29 +11,37 @@
       <button class="btn-login" @click="handleLogin">微信扫码登录</button>
     </template>
     <template v-else-if="loginStatus === 'pending' || loginStatus === 'scanned'">
-      <div class="qrcode-container">
-        <img :src="qrcodeUrl" alt="扫码登录" class="qrcode" />
-        <p class="qrcode-hint">
-          {{ loginStatus === 'pending' ? '请使用微信扫码' : '已扫码，请确认登录' }}
-        </p>
+      <div class="qrcode-popover" v-if="showQR">
+        <div class="qrcode-backdrop" @click="showQR = false"></div>
+        <div class="qrcode-content">
+          <img :src="qrcodeUrl" alt="扫码登录" class="qrcode" />
+          <p class="qrcode-hint">
+            {{ loginStatus === 'pending' ? '请使用微信扫码' : '已扫码，请确认登录' }}
+          </p>
+          <button class="btn-close" @click="showQR = false">关闭</button>
+        </div>
       </div>
+      <button class="btn-login" @click="showQR = true">登录中...</button>
     </template>
     <template v-else-if="loginStatus === 'expired'">
-      <p class="expired">二维码已过期</p>
       <button class="btn-login" @click="handleLogin">重新获取</button>
     </template>
   </div>
 </template>
 
 <script setup>
+import { ref } from 'vue'
 import { useUserStore } from '../stores/user'
 import { storeToRefs } from 'pinia'
 
 const userStore = useUserStore()
 const { isLoggedIn, user, loginStatus, qrcodeUrl } = storeToRefs(userStore)
+const showQR = ref(false)
 
 async function handleLogin() {
+  showQR.value = false
   await userStore.startLogin()
+  showQR.value = true
 }
 
 async function handleLogout() {
@@ -43,80 +51,107 @@ async function handleLogout() {
 
 <style scoped>
 .login-panel {
-  display: flex;
-  align-items: center;
+  position: relative;
 }
 
 .btn-login {
-  padding: 8px 16px;
-  background: rgba(255,255,255,0.2);
-  border: 1px solid rgba(255,255,255,0.5);
+  padding: 6px 14px;
+  background: #f5f5f5;
+  border: 1px solid #ddd;
   border-radius: 4px;
-  color: white;
+  color: #666;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .btn-login:hover {
-  background: rgba(255,255,255,0.3);
+  background: #eee;
 }
 
 .user-info {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .avatar {
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
-  background: rgba(255,255,255,0.3);
+  background: #f5f5f5;
 }
 
 .nickname {
-  font-size: 14px;
+  font-size: 13px;
+  color: #666;
 }
 
 .btn-logout {
-  padding: 4px 12px;
-  background: rgba(255,255,255,0.2);
-  border: 1px solid rgba(255,255,255,0.3);
+  padding: 4px 10px;
+  background: none;
+  border: 1px solid #ddd;
   border-radius: 4px;
-  color: white;
+  color: #999;
   cursor: pointer;
   font-size: 12px;
 }
 
 .btn-logout:hover {
-  background: rgba(255,255,255,0.3);
+  border-color: #e53935;
+  color: #e53935;
 }
 
-.qrcode-container {
+.qrcode-popover {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1000;
+}
+
+.qrcode-backdrop {
   position: absolute;
-  top: 60px;
-  right: 20px;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.4);
+}
+
+.qrcode-content {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
   background: white;
-  padding: 16px;
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  padding: 24px;
+  border-radius: 12px;
   text-align: center;
-  z-index: 100;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.15);
 }
 
 .qrcode {
-  width: 150px;
-  height: 150px;
+  width: 180px;
+  height: 180px;
 }
 
 .qrcode-hint {
-  margin: 8px 0 0;
-  font-size: 12px;
+  margin: 12px 0;
+  font-size: 14px;
   color: #666;
 }
 
-.expired {
-  color: #e53935;
-  font-size: 14px;
+.btn-close {
+  padding: 6px 20px;
+  background: #f5f5f5;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.btn-close:hover {
+  background: #eee;
 }
 </style>

@@ -3,45 +3,41 @@ import { ref } from 'vue'
 import { numbersApi } from '../api'
 
 export const useNumbersStore = defineStore('numbers', () => {
-  const currentNumbers = ref([])
+  const groups = ref([
+    { red: '', blue: '' },
+    { red: '', blue: '' },
+    { red: '', blue: '' },
+    { red: '', blue: '' },
+    { red: '', blue: '' },
+  ])
   const savedNumbers = ref([])
 
-  function addNumber() {
-    if (currentNumbers.value.length >= 10) return
-    currentNumbers.value.push({ red: [null, null, null, null, null, null], blue: null })
+  function parseNumbers(input) {
+    if (!input) return []
+    return input
+      .split(/[\s,，]+/)
+      .map(s => parseInt(s.trim()))
+      .filter(n => !isNaN(n))
   }
 
-  function removeNumber(index) {
-    currentNumbers.value.splice(index, 1)
-  }
-
-  function setNumber(index, ballType, ballIndex, value) {
-    const num = value === '' ? null : parseInt(value)
-    if (ballType === 'red') {
-      currentNumbers.value[index].red[ballIndex] = num
-    } else {
-      currentNumbers.value[index].blue = num
-    }
-  }
-
-  function validateNumber(group) {
+  function validateGroup(group) {
     const errors = []
-    const redSet = new Set()
+    const reds = parseNumbers(group.red)
 
-    for (let i = 0; i < 6; i++) {
-      if (group.red[i] === null || isNaN(group.red[i])) {
-        errors.push(`第${i + 1}个红球不能为空`)
-      } else if (group.red[i] < 1 || group.red[i] > 33) {
-        errors.push(`第${i + 1}个红球必须在1-33之间`)
-      } else if (redSet.has(group.red[i])) {
-        errors.push(`第${i + 1}个红球与前面的重复`)
-      }
-      redSet.add(group.red[i])
+    if (reds.length !== 6) {
+      errors.push('请输入6个红球号码')
+    } else {
+      const invalid = reds.filter(n => n < 1 || n > 33)
+      if (invalid.length > 0) errors.push('红球必须在1-33之间')
+
+      const unique = new Set(reds)
+      if (unique.size !== reds.length) errors.push('红球号码不能重复')
     }
 
-    if (group.blue === null || isNaN(group.blue)) {
-      errors.push('蓝球不能为空')
-    } else if (group.blue < 1 || group.blue > 16) {
+    const blue = parseInt(group.blue)
+    if (!group.blue || isNaN(blue)) {
+      errors.push('请输入蓝球号码')
+    } else if (blue < 1 || blue > 16) {
       errors.push('蓝球必须在1-16之间')
     }
 
@@ -50,38 +46,52 @@ export const useNumbersStore = defineStore('numbers', () => {
 
   function validateAll() {
     const allErrors = []
-    for (let i = 0; i < currentNumbers.value.length; i++) {
-      const errors = validateNumber(currentNumbers.value[i])
-      if (errors.length > 0) {
-        allErrors.push({ index: i, errors })
+    let validCount = 0
+    for (let i = 0; i < groups.value.length; i++) {
+      if (groups.value[i].red.trim() || groups.value[i].blue.trim()) {
+        const errors = validateGroup(groups.value[i])
+        if (errors.length > 0) {
+          allErrors.push({ index: i, errors })
+        } else {
+          validCount++
+        }
       }
     }
-    return allErrors
+    return { errors: allErrors, validCount }
+  }
+
+  function getValidNumbers() {
+    const result = []
+    for (const group of groups.value) {
+      if (group.red.trim() && group.blue.trim()) {
+        const reds = parseNumbers(group.red)
+        const blue = parseInt(group.blue)
+        if (reds.length === 6 && !isNaN(blue)) {
+          result.push({ red: reds, blue })
+        }
+      }
+    }
+    return result
   }
 
   function isFormValid() {
-    return currentNumbers.value.length > 0 && validateAll().length === 0
+    const { errors, validCount } = validateAll()
+    return validCount > 0 && errors.length === 0
   }
 
   async function loadSaved() {
     try {
       const { data } = await numbersApi.getSaved()
-      savedNumbers.value = data.numbers.map(n => ({
-        id: n.id,
-        red: n.red,
-        blue: n.blue,
-      }))
+      savedNumbers.value = data.numbers
     } catch {
       savedNumbers.value = []
     }
   }
 
   async function saveNumbers() {
-    const formatted = currentNumbers.value.map(n => ({
-      red: n.red,
-      blue: n.blue,
-    }))
-    await numbersApi.save(formatted)
+    const valid = getValidNumbers()
+    if (valid.length === 0) return
+    await numbersApi.save(valid)
     await loadSaved()
   }
 
@@ -90,25 +100,14 @@ export const useNumbersStore = defineStore('numbers', () => {
     await loadSaved()
   }
 
-  function loadToCurrent(saved) {
-    currentNumbers.value = saved.map(n => ({
-      red: [...n.red],
-      blue: n.blue,
-    }))
-  }
-
   return {
-    currentNumbers,
+    groups,
     savedNumbers,
-    addNumber,
-    removeNumber,
-    setNumber,
-    validateNumber,
     validateAll,
+    getValidNumbers,
     isFormValid,
     loadSaved,
     saveNumbers,
     deleteSaved,
-    loadToCurrent,
   }
 })

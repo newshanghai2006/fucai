@@ -8,6 +8,7 @@ export const useResultStore = defineStore('result', () => {
   const compareResults = ref([])
   const isLoading = ref(false)
   const error = ref('')
+  const drawInfo = ref(null)
 
   const summary = computed(() => {
     let totalWinCount = 0
@@ -32,43 +33,35 @@ export const useResultStore = defineStore('result', () => {
     return data.periods
   }
 
-  async function submitCompare(numbers) {
-    if (!selectedPeriod.value) {
-      error.value = '请先选择期数'
-      return
-    }
-
+  async function submitCompare(numbers, drawNumbers) {
     isLoading.value = true
     error.value = ''
     compareResults.value = []
 
     try {
-      const p = periods.value.length > 0 ? periods.value : await fetchPeriods()
-      const period = p.find(pp => pp.period === selectedPeriod.value.period)
-      if (!period) {
-        error.value = '选中的期数不存在'
+      const { red: drawRed, blue: drawBlue } = drawNumbers
+      if (!drawRed || drawRed.length !== 6 || !drawBlue) {
+        error.value = '开奖号码不完整'
         return
       }
 
+      drawInfo.value = { red: drawRed, blue: drawBlue }
+
       compareResults.value = numbers.map(numberGroup => {
-        const redMatch = numberGroup.red.filter(n => period.red.includes(n)).length
-        const blueMatch = numberGroup.blue === period.blue ? 1 : 0
+        const redMatch = numberGroup.red.filter(n => drawRed.includes(n)).length
+        const blueMatch = numberGroup.blue === drawBlue ? 1 : 0
         const prize = getPrize(redMatch, blueMatch)
 
         return {
           red: numberGroup.red,
           blue: numberGroup.blue,
-          period: period.period,
-          drawDate: period.date,
-          drawRed: period.red,
-          drawBlue: period.blue,
           redMatch,
           blueMatch,
           ...prize,
         }
       })
     } catch (err) {
-      error.value = '开奖数据获取失败，请稍后重试'
+      error.value = '核对失败，请稍后重试'
       console.error(err)
     } finally {
       isLoading.value = false
@@ -92,16 +85,17 @@ export const useResultStore = defineStore('result', () => {
 
     for (const rule of rules) {
       if (rule.r === redMatch && rule.b === blueMatch) {
-        return { won: true, level: rule.level, name: rule.name, prize: rule.prize, note: rule.note, redMatch, blueMatch }
+        return { won: true, level: rule.level, name: rule.name, prize: rule.prize, note: rule.note }
       }
     }
 
-    return { won: false, level: 0, name: '未中奖', prize: 0, note: '', redMatch, blueMatch }
+    return { won: false, level: 0, name: '未中奖', prize: 0, note: '' }
   }
 
   function reset() {
     compareResults.value = []
     error.value = ''
+    drawInfo.value = null
   }
 
   return {
@@ -111,6 +105,7 @@ export const useResultStore = defineStore('result', () => {
     isLoading,
     error,
     summary,
+    drawInfo,
     fetchPeriods,
     submitCompare,
     reset,

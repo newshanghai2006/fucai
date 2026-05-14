@@ -26,23 +26,6 @@ input[type="number"] {
   -moz-appearance: textfield;
 }
 
-@media (max-width: 768px) {
-  .balls-row {
-    justify-content: center;
-  }
-
-  .ball-input input {
-    width: 36px;
-    height: 36px;
-    font-size: 14px;
-  }
-
-  .result-table {
-    font-size: 12px;
-  }
-
-  .result-table th,
-  .result-table td {
-    padding: 6px 8px;
-  }
+input[type="text"]::placeholder {
+  color: #bbb;
 }
