@@ -2,10 +2,10 @@ const express = require('express');
 const router = express.Router();
 const { getRecentPeriods } = require('../services/lotteryService');
 
-router.get('/recent', (req, res) => {
+router.get('/recent', async (req, res) => {
   try {
     const count = parseInt(req.query.count) || 20;
-    const periods = getRecentPeriods(count);
+    const periods = await getRecentPeriods(count);
     res.json({ periods, count: periods.length });
   } catch (err) {
     console.error('获取开奖数据失败:', err);
