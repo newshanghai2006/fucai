@@ -1,15 +1,55 @@
 <template>
   <div class="login-container">
     <div class="login-box">
-      <h2 class="login-title">登录</h2>
-      <p class="login-subtitle">登录后可保存您的号码组</p>
+      <h2 class="login-title">邮箱登录</h2>
+      <p class="login-subtitle">输入邮箱和验证码登录</p>
 
-      <button class="btn-github" @click="handleGitHubLogin" :disabled="isLoading">
-        <svg class="github-icon" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-4.442 0-.981.355-1.782.931-2.404-.303-.926-.353-1.236-.353-1.236-.516.012-.773.465-.773.465-1.052.83-1.029 2.525-.967 2.865 1.222.692 2.264 1.267 3.096 1.115 1.827-.133 2.664-1.292 2.833-2.326.379-.362.999-.395 1.467-.295.628.131 1.344.557 1.467 1.095.173.748.491 1.482.491 2.534 0 3.121-2.804 4.139-5.475 4.436.328.286.62.853.62 1.726v2.56c0 .325.19.699.811.574C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/>
-        </svg>
-        {{ isLoading ? '登录中...' : '使用 GitHub 登录' }}
-      </button>
+      <div v-if="!codeSent" class="input-section">
+        <div class="input-group">
+          <label class="input-label">邮箱地址</label>
+          <input
+            type="email"
+            v-model="email"
+            placeholder="your@email.com"
+            class="email-input"
+            :disabled="isLoading"
+          />
+        </div>
+        <button
+          class="btn-send"
+          @click="sendCode"
+          :disabled="isLoading || !isValidEmail"
+        >
+          {{ isLoading ? '发送中...' : '获取验证码' }}
+        </button>
+      </div>
+
+      <div v-else class="input-section">
+        <div class="input-group">
+          <label class="input-label">验证码</label>
+          <input
+            type="text"
+            v-model="code"
+            placeholder="6 位数字验证码"
+            maxlength="6"
+            class="code-input"
+            :disabled="isLoading"
+          />
+        </div>
+        <div class="code-hint">
+          验证码已发送到 {{ email }}
+          <button class="btn-resend" @click="sendCode" :disabled="resendCountdown > 0">
+            {{ resendCountdown > 0 ? `${resendCountdown}s 后重发` : '重新发送' }}
+          </button>
+        </div>
+        <button
+          class="btn-login"
+          @click="handleLogin"
+          :disabled="isLoading || code.length !== 6"
+        >
+          {{ isLoading ? '登录中...' : '登录' }}
+        </button>
+      </div>
 
       <div class="login-tips">
         <p>登录后的功能：</p>
@@ -24,25 +64,94 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
-const isLoading = ref(false)
 
-async function handleGitHubLogin() {
+const email = ref('')
+const code = ref('')
+const codeSent = ref(false)
+const isLoading = ref(false)
+const resendCountdown = ref(0)
+
+const isValidEmail = computed(() => {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value)
+})
+
+let countdownTimer = null
+
+function startCountdown() {
+  resendCountdown.value = 60
+  countdownTimer = setInterval(() => {
+    resendCountdown.value--
+    if (resendCountdown.value <= 0) {
+      clearInterval(countdownTimer)
+    }
+  }, 1000)
+}
+
+onMounted(() => {
+  return () => {
+    if (countdownTimer) clearInterval(countdownTimer)
+  }
+})
+
+async function sendCode() {
+  if (!isValidEmail.value) return
+  
   isLoading.value = true
   try {
-    const response = await fetch('/api/auth/github')
+    const response = await fetch('/api/auth/send-code', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email.value.trim() }),
+    })
+    
     const data = await response.json()
     
-    if (data.authorizeUrl) {
-      window.location.href = data.authorizeUrl
+    if (response.ok) {
+      codeSent.value = true
+      startCountdown()
+      alert('验证码已发送，请查看控制台日志')
     } else {
-      alert('获取授权 URL 失败')
+      alert(data.error || '发送失败')
     }
   } catch (err) {
-    console.error('GitHub 登录失败:', err)
+    console.error('发送验证码失败:', err)
+    alert('发送失败，请重试')
+  } finally {
+    isLoading.value = false
+  }
+}
+
+async function handleLogin() {
+  if (code.value.length !== 6) return
+  
+  isLoading.value = true
+  try {
+    const response = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email.value.trim(), code: code.value }),
+    })
+    
+    const data = await response.json()
+    
+    if (response.ok) {
+      localStorage.setItem('token', data.token)
+      localStorage.setItem('user', JSON.stringify({
+        id: data.user.id,
+        email: data.user.email,
+        name: data.user.name,
+        avatar: data.user.avatar,
+      }))
+      router.push('/')
+    } else {
+      alert(data.error || '登录失败')
+    }
+  } catch (err) {
+    console.error('登录失败:', err)
     alert('登录失败，请重试')
   } finally {
     isLoading.value = false
@@ -81,36 +190,111 @@ async function handleGitHubLogin() {
   font-size: 14px;
 }
 
-.btn-github {
+.input-section {
+  margin-bottom: 20px;
+}
+
+.input-group {
+  margin-bottom: 20px;
+  text-align: left;
+}
+
+.input-label {
+  display: block;
+  font-size: 14px;
+  color: #555;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.email-input,
+.code-input {
   width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
+  padding: 12px 16px;
+  border: 2px solid #eee;
+  border-radius: 8px;
+  font-size: 16px;
+  transition: all 0.3s;
+  box-sizing: border-box;
+}
+
+.email-input:focus,
+.code-input:focus {
+  outline: none;
+  border-color: #e53935;
+  box-shadow: 0 0 0 3px rgba(229, 57, 53, 0.1);
+}
+
+.email-input:disabled,
+.code-input:disabled {
+  background: #f5f5f5;
+  cursor: not-allowed;
+}
+
+.btn-send,
+.btn-login {
+  width: 100%;
   padding: 14px 24px;
-  background: #24292e;
-  color: white;
   border: none;
   border-radius: 8px;
   font-size: 16px;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.3s;
 }
 
-.btn-github:hover:not(:disabled) {
-  background: #1c2128;
-  transform: translateY(-2px);
+.btn-send {
+  background: #1976d2;
+  color: white;
 }
 
-.btn-github:disabled {
+.btn-send:hover:not(:disabled) {
+  background: #1565c0;
+}
+
+.btn-login {
+  background: #e53935;
+  color: white;
+}
+
+.btn-login:hover:not(:disabled) {
+  background: #c62828;
+}
+
+.btn-send:disabled,
+.btn-login:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
 
-.github-icon {
-  width: 24px;
-  height: 24px;
+.code-hint {
+  font-size: 13px;
+  color: #666;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.btn-resend {
+  padding: 4px 12px;
+  background: none;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  color: #666;
+  cursor: pointer;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.btn-resend:hover:not(:disabled) {
+  background: #f5f5f5;
+}
+
+.btn-resend:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .login-tips {
@@ -145,6 +329,11 @@ async function handleGitHubLogin() {
   
   .login-title {
     font-size: 24px;
+  }
+  
+  .code-hint {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
 </style>

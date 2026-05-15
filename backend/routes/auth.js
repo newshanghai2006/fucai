@@ -1,53 +1,47 @@
 const express = require('express');
 const router = express.Router();
 const {
-  getGitHubOAuthURL,
-  exchangeCodeForToken,
-  getGitHubUser,
-  generateToken,
-  saveOrUpdateUser,
+  requestVerificationCode,
+  verifyCode,
   getUserByToken,
 } = require('../services/authService');
 
-router.get('/github', (req, res) => {
+router.post('/send-code', (req, res) => {
   try {
-    const { authorizeUrl, state } = getGitHubOAuthURL();
-    res.json({ authorizeUrl, state });
+    const { email } = req.body;
+    
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ error: '请输入有效的邮箱地址' });
+    }
+    
+    const result = requestVerificationCode(email.toLowerCase().trim());
+    res.json(result);
   } catch (err) {
-    console.error('生成 GitHub 授权 URL 失败:', err);
-    res.status(500).json({ error: '生成授权 URL 失败' });
+    console.error('发送验证码失败:', err);
+    res.status(500).json({ error: '发送验证码失败' });
   }
 });
 
-router.get('/github/callback', async (req, res) => {
+router.post('/login', (req, res) => {
   try {
-    const { code, state } = req.query;
-
-    if (!code) {
-      return res.status(400).json({ error: '缺少 code 参数' });
+    const { email, code } = req.body;
+    
+    if (!email || !code) {
+      return res.status(400).json({ error: '请输入邮箱和验证码' });
     }
-
-    const accessToken = await exchangeCodeForToken(code);
-    if (!accessToken) {
-      return res.status(500).json({ error: '获取 access token 失败' });
+    
+    const result = verifyCode(email.toLowerCase().trim(), code);
+    
+    if (result.success) {
+      res.json({
+        token: result.token,
+        user: result.user,
+      });
+    } else {
+      res.status(400).json({ error: result.error });
     }
-
-    const githubUser = await getGitHubUser(accessToken);
-    if (!githubUser) {
-      return res.status(500).json({ error: '获取用户信息失败' });
-    }
-
-    const token = generateToken(githubUser);
-    const user = saveOrUpdateUser(githubUser, token);
-
-    res.redirect(`/auth/success?token=${token}&user=${encodeURIComponent(JSON.stringify({
-      id: user.id,
-      name: user.name,
-      login: user.login,
-      avatar: user.avatar,
-    }))}`);
   } catch (err) {
-    console.error('GitHub 登录回调失败:', err);
+    console.error('登录失败:', err);
     res.status(500).json({ error: '登录失败' });
   }
 });
@@ -58,20 +52,20 @@ router.get('/me', (req, res) => {
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return res.status(401).json({ error: '未授权' });
     }
-
+    
     const token = authHeader.substring(7);
-    const decoded = getUserByToken(token);
-
-    if (!decoded) {
+    const user = getUserByToken(token);
+    
+    if (!user) {
       return res.status(401).json({ error: 'token 无效或已过期' });
     }
-
+    
     res.json({
       user: {
-        id: decoded.id,
-        name: decoded.name,
-        login: decoded.login,
-        avatar: decoded.avatar,
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        avatar: user.avatar,
       },
     });
   } catch (err) {

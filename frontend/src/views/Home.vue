@@ -3,8 +3,9 @@
     <div class="header-row">
       <h1 class="page-title">双色球中奖检查器</h1>
       <div v-if="currentUser" class="user-info">
-        <img :src="currentUser.avatar" class="user-avatar" alt="avatar" />
-        <span class="user-name">{{ currentUser.name }}</span>
+        <img v-if="currentUser.avatar" :src="currentUser.avatar" class="user-avatar" alt="avatar" />
+        <div v-else class="user-avatar-placeholder">{{ currentUser.name?.charAt(0).toUpperCase() }}</div>
+        <span class="user-name">{{ currentUser.name || currentUser.email }}</span>
         <button class="btn-logout" @click="handleLogout">退出</button>
       </div>
       <router-link v-else to="/login" class="btn-login">登录</router-link>
@@ -374,6 +375,19 @@ watch(selectedPeriod, (newVal) => {
   width: 32px;
   height: 32px;
   border-radius: 50%;
+}
+
+.user-avatar-placeholder {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #e53935;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 14px;
 }
 
 .user-name {

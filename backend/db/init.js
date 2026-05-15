@@ -6,13 +6,9 @@ function initDatabase() {
   db.exec(`
     CREATE TABLE IF NOT EXISTS User (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      openId VARCHAR(64) UNIQUE,
-      githubId VARCHAR(32) UNIQUE,
-      nickname VARCHAR(128) DEFAULT '',
-      login VARCHAR(128) DEFAULT '',
+      email VARCHAR(256) UNIQUE NOT NULL,
       name VARCHAR(128) DEFAULT '',
       avatar VARCHAR(512) DEFAULT '',
-      email VARCHAR(256) DEFAULT '',
       token VARCHAR(512) DEFAULT '',
       tokenExpiry DATETIME DEFAULT NULL,
       createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -36,8 +32,7 @@ function initDatabase() {
       fetchedAt DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
-    CREATE INDEX IF NOT EXISTS idx_user_openId ON User(openId);
-    CREATE INDEX IF NOT EXISTS idx_user_githubId ON User(githubId);
+    CREATE INDEX IF NOT EXISTS idx_user_email ON User(email);
     CREATE INDEX IF NOT EXISTS idx_userNumber_userId ON UserNumber(userId);
     CREATE INDEX IF NOT EXISTS idx_lotteryPeriod_drawDate ON LotteryPeriod(drawDate);
   `);
