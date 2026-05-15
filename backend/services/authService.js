@@ -10,12 +10,12 @@ const CODE_EXPIRY_MINUTES = 10;
 const verificationCodes = new Map();
 
 const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || 'smtp.163.com',
-  port: parseInt(process.env.SMTP_PORT || '465'),
+  host: 'smtp.163.com',
+  port: 465,
   secure: true,
   auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
+    user: 'tomida2026@163.com',
+    pass: 'RLQHiBjAKCRSiz8U',
   },
 });
 
@@ -44,9 +44,10 @@ function verifyToken(token) {
 
 async function sendEmail(email, code) {
   const mailOptions = {
-    from: process.env.SMTP_FROM || 'tomida2026@163.com',
+    from: process.env.SMTP_USER,
     to: email,
     subject: '【双色球中奖检查器】验证码',
+    text: `您好！\n\n您正在登录双色球中奖检查器，验证码是：${code}\n\n验证码有效期为 10 分钟，请尽快使用。\n\n如果这不是您本人的操作，请忽略此邮件。`,
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2 style="color: #e53935;">双色球中奖检查器</h2>
@@ -64,11 +65,12 @@ async function sendEmail(email, code) {
   };
 
   try {
+    console.log(`正在发送邮件到 ${email}...`);
     const info = await transporter.sendMail(mailOptions);
-    console.log(`邮件已发送到 ${email}: ${info.messageId}`);
+    console.log(`✓ 邮件发送成功：${info.messageId}`);
     return true;
   } catch (err) {
-    console.error('邮件发送失败:', err);
+    console.error('✗ 邮件发送失败:', err.message);
     return false;
   }
 }
@@ -83,10 +85,7 @@ async function requestVerificationCode(email) {
     attempts: 0,
   });
   
-  // 尝试发送邮件
   const emailSuccess = await sendEmail(email, code);
-  
-  // 同时输出到日志（开发和测试用）
   console.log(`\n【验证码】${email} 的验证码是：${code}（有效期${CODE_EXPIRY_MINUTES}分钟）\n`);
   
   if (emailSuccess) {
@@ -95,10 +94,9 @@ async function requestVerificationCode(email) {
       message: `验证码已发送到 ${email}，有效期${CODE_EXPIRY_MINUTES}分钟`,
     };
   } else {
-    // 邮件发送失败时，仍然允许使用日志中的验证码登录（测试模式）
     return {
       success: true,
-      message: `测试模式：请使用日志中的验证码（邮箱发送失败）`,
+      message: `请使用日志中的验证码（邮件发送失败）`,
     };
   }
 }
