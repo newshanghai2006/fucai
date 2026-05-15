@@ -8,7 +8,13 @@
 • 后端 (Node.js + Express + SQLite): 开奖数据API、用户认证、号码组CRUD
 • 内置20期模拟开奖数据用于比对
 • 完整的中奖判定规则(一至六等奖)
+
+
+
 访问地址: https://3000-48fc2339a44e6c68.monkeycode-ai.online
+
+
+
 项目结构:
 • backend/ - 后端服务 (端口3001)
 • frontend/ - 前端应用 (端口3000)
