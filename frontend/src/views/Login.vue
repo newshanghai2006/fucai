@@ -2,9 +2,9 @@
   <div class="login-container">
     <div class="login-box">
       <h2 class="login-title">邮箱登录</h2>
-      <p class="login-subtitle">输入邮箱和验证码登录</p>
+      <p class="login-subtitle">登录后自动同步您的号码组</p>
 
-      <div v-if="!codeSent" class="input-section">
+      <div class="input-section">
         <div class="input-group">
           <label class="input-label">邮箱地址</label>
           <input
@@ -15,37 +15,20 @@
             :disabled="isLoading"
           />
         </div>
-        <button
-          class="btn-send"
-          @click="sendCode"
-          :disabled="isLoading || !isValidEmail"
-        >
-          {{ isLoading ? '发送中...' : '获取验证码' }}
-        </button>
-      </div>
-
-      <div v-else class="input-section">
         <div class="input-group">
-          <label class="input-label">验证码</label>
+          <label class="input-label">密码</label>
           <input
-            type="text"
-            v-model="code"
-            placeholder="6 位数字验证码"
-            maxlength="6"
-            class="code-input"
+            type="password"
+            v-model="password"
+            placeholder="请输入密码"
+            class="password-input"
             :disabled="isLoading"
           />
-        </div>
-        <div class="code-hint">
-          验证码已发送到 {{ email }}
-          <button class="btn-resend" @click="sendCode" :disabled="resendCountdown > 0">
-            {{ resendCountdown > 0 ? `${resendCountdown}s 后重发` : '重新发送' }}
-          </button>
         </div>
         <button
           class="btn-login"
           @click="handleLogin"
-          :disabled="isLoading || code.length !== 6"
+          :disabled="isLoading || !isValidEmail || !password"
         >
           {{ isLoading ? '登录中...' : '登录' }}
         </button>
@@ -64,76 +47,28 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
 
 const email = ref('')
-const code = ref('')
-const codeSent = ref(false)
+const password = ref('')
 const isLoading = ref(false)
-const resendCountdown = ref(0)
 
 const isValidEmail = computed(() => {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value)
 })
 
-let countdownTimer = null
-
-function startCountdown() {
-  resendCountdown.value = 60
-  countdownTimer = setInterval(() => {
-    resendCountdown.value--
-    if (resendCountdown.value <= 0) {
-      clearInterval(countdownTimer)
-    }
-  }, 1000)
-}
-
-onMounted(() => {
-  return () => {
-    if (countdownTimer) clearInterval(countdownTimer)
-  }
-})
-
-async function sendCode() {
-  if (!isValidEmail.value) return
-  
-  isLoading.value = true
-  try {
-    const response = await fetch('/api/auth/send-code', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: email.value.trim() }),
-    })
-    
-    const data = await response.json()
-    
-    if (response.ok) {
-      codeSent.value = true
-      startCountdown()
-      alert(`验证码已发送到 ${email.value}\n\n如果未收到邮件，请联系管理员查看服务器日志获取验证码。`)
-    } else {
-      alert(data.error || '发送失败')
-    }
-  } catch (err) {
-    console.error('发送验证码失败:', err)
-    alert('发送失败，请重试')
-  } finally {
-    isLoading.value = false
-  }
-}
-
 async function handleLogin() {
-  if (code.value.length !== 6) return
+  if (!isValidEmail.value || !password.value) return
   
   isLoading.value = true
   try {
     const response = await fetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: email.value.trim(), code: code.value }),
+      body: JSON.stringify({ email: email.value.trim(), password: password.value }),
     })
     
     const data = await response.json()
@@ -208,7 +143,7 @@ async function handleLogin() {
 }
 
 .email-input,
-.code-input {
+.password-input {
   width: 100%;
   padding: 12px 16px;
   border: 2px solid #eee;
@@ -219,81 +154,37 @@ async function handleLogin() {
 }
 
 .email-input:focus,
-.code-input:focus {
+.password-input:focus {
   outline: none;
   border-color: #e53935;
   box-shadow: 0 0 0 3px rgba(229, 57, 53, 0.1);
 }
 
 .email-input:disabled,
-.code-input:disabled {
+.password-input:disabled {
   background: #f5f5f5;
   cursor: not-allowed;
 }
 
-.btn-send,
 .btn-login {
   width: 100%;
   padding: 14px 24px;
   border: none;
   border-radius: 8px;
+  background: #e53935;
+  color: white;
   font-size: 16px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s;
 }
 
-.btn-send {
-  background: #1976d2;
-  color: white;
-}
-
-.btn-send:hover:not(:disabled) {
-  background: #1565c0;
-}
-
-.btn-login {
-  background: #e53935;
-  color: white;
-}
-
 .btn-login:hover:not(:disabled) {
   background: #c62828;
 }
 
-.btn-send:disabled,
 .btn-login:disabled {
   opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.code-hint {
-  font-size: 13px;
-  color: #666;
-  margin-bottom: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.btn-resend {
-  padding: 4px 12px;
-  background: none;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  color: #666;
-  cursor: pointer;
-  font-size: 12px;
-  white-space: nowrap;
-}
-
-.btn-resend:hover:not(:disabled) {
-  background: #f5f5f5;
-}
-
-.btn-resend:disabled {
-  opacity: 0.5;
   cursor: not-allowed;
 }
 
@@ -329,11 +220,6 @@ async function handleLogin() {
   
   .login-title {
     font-size: 24px;
-  }
-  
-  .code-hint {
-    flex-direction: column;
-    align-items: flex-start;
   }
 }
 </style>

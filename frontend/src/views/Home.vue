@@ -62,7 +62,7 @@
     <div class="section">
       <div class="section-title">
         号码组
-        <span v-if="currentUser" class="save-status">{{ saveStatus }}</span>
+        <span v-if="currentUser && saveStatus" class="save-status">{{ saveStatus }}</span>
         <button v-if="currentUser && hasChanges" class="btn-save" @click="saveNumbers" :disabled="isSaving">
           {{ isSaving ? '保存中...' : '保存到云端' }}
         </button>

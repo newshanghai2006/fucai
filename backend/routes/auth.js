@@ -1,36 +1,16 @@
 const express = require('express');
 const router = express.Router();
-const {
-  requestVerificationCode,
-  verifyCode,
-  getUserByToken,
-} = require('../services/authService');
-
-router.post('/send-code', (req, res) => {
-  try {
-    const { email } = req.body;
-    
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      return res.status(400).json({ error: '请输入有效的邮箱地址' });
-    }
-    
-    const result = requestVerificationCode(email.toLowerCase().trim());
-    res.json(result);
-  } catch (err) {
-    console.error('发送验证码失败:', err);
-    res.status(500).json({ error: '发送验证码失败' });
-  }
-});
+const { login, getUserByToken } = require('../services/authService');
 
 router.post('/login', (req, res) => {
   try {
-    const { email, code } = req.body;
+    const { email, password } = req.body;
     
-    if (!email || !code) {
-      return res.status(400).json({ error: '请输入邮箱和验证码' });
+    if (!email || !password) {
+      return res.status(400).json({ error: '请输入邮箱和密码' });
     }
     
-    const result = verifyCode(email.toLowerCase().trim(), code);
+    const result = login(email.toLowerCase().trim(), password);
     
     if (result.success) {
       res.json({
