@@ -6,10 +6,14 @@ function initDatabase() {
   db.exec(`
     CREATE TABLE IF NOT EXISTS User (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      openId VARCHAR(64) UNIQUE NOT NULL,
+      openId VARCHAR(64) UNIQUE,
+      githubId VARCHAR(32) UNIQUE,
       nickname VARCHAR(128) DEFAULT '',
+      login VARCHAR(128) DEFAULT '',
+      name VARCHAR(128) DEFAULT '',
       avatar VARCHAR(512) DEFAULT '',
-      token VARCHAR(256) DEFAULT '',
+      email VARCHAR(256) DEFAULT '',
+      token VARCHAR(512) DEFAULT '',
       tokenExpiry DATETIME DEFAULT NULL,
       createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
       updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -33,9 +37,12 @@ function initDatabase() {
     );
 
     CREATE INDEX IF NOT EXISTS idx_user_openId ON User(openId);
+    CREATE INDEX IF NOT EXISTS idx_user_githubId ON User(githubId);
     CREATE INDEX IF NOT EXISTS idx_userNumber_userId ON UserNumber(userId);
     CREATE INDEX IF NOT EXISTS idx_lotteryPeriod_drawDate ON LotteryPeriod(drawDate);
   `);
+
+  console.log('数据库初始化完成');
 }
 
 module.exports = { initDatabase };

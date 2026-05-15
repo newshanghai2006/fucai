@@ -1,6 +1,14 @@
 <template>
   <div class="home">
-    <h1 class="page-title">双色球中奖检查器</h1>
+    <div class="header-row">
+      <h1 class="page-title">双色球中奖检查器</h1>
+      <div v-if="currentUser" class="user-info">
+        <img :src="currentUser.avatar" class="user-avatar" alt="avatar" />
+        <span class="user-name">{{ currentUser.name }}</span>
+        <button class="btn-logout" @click="handleLogout">退出</button>
+      </div>
+      <router-link v-else to="/login" class="btn-login">登录</router-link>
+    </div>
 
     <div class="section">
       <label class="checkbox-label">
@@ -51,7 +59,16 @@
     </div>
 
     <div class="section">
-      <div class="section-title">5 组自选号（自动保存）</div>
+      <div class="section-title">
+        号码组
+        <span v-if="currentUser" class="save-status">{{ saveStatus }}</span>
+        <button v-if="currentUser && hasChanges" class="btn-save" @click="saveNumbers" :disabled="isSaving">
+          {{ isSaving ? '保存中...' : '保存到云端' }}
+        </button>
+      </div>
+      <div v-if="!currentUser" class="login-hint">
+        <router-link to="/login">登录</router-link> 后可保存号码组到云端
+      </div>
       <div v-for="(group, i) in groups" :key="'group-' + i" class="group-row">
         <span class="group-label">第{{ i + 1 }}组：</span>
         <div class="group-inputs">
@@ -117,6 +134,12 @@ const groups = reactive([
   { redBalls: ['', '', '', '', '', ''], blueBall: '' },
 ])
 
+const currentUser = ref(null)
+const saveStatus = ref('')
+const hasChanges = ref(false)
+const isSaving = ref(false)
+const originalNumbers = ref([])
+
 function parseNumberArray(arr) {
   return arr.map(s => parseInt(s)).filter(n => !isNaN(n))
 }
@@ -158,18 +181,107 @@ const hasValidInput = computed(() => {
   return validCount > 0 && allErrors.length === 0
 })
 
-onMounted(async () => {
-  await resultStore.fetchPeriods()
-})
-
-watch(selectedPeriod, (newVal) => {
-  if (newVal && !useCustomDraw.value) {
-    for (let i = 0; i < 6; i++) {
-      drawRedBalls[i] = String(newVal.red[i])
+async function checkAuth() {
+  const token = localStorage.getItem('token')
+  const userStr = localStorage.getItem('user')
+  if (token && userStr) {
+    try {
+      const res = await fetch('/api/auth/me', {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (res.ok) {
+        const data = await res.json()
+        currentUser.value = data.user
+        loadUserNumbers()
+      } else {
+        localStorage.removeItem('token')
+        localStorage.removeItem('user')
+      }
+    } catch (err) {
+      console.error('检查登录状态失败:', err)
     }
-    drawBlueBall.value = String(newVal.blue)
   }
-}, { immediate: true })
+}
+
+async function loadUserNumbers() {
+  const token = localStorage.getItem('token')
+  if (!token || !currentUser.value) return
+  
+  try {
+    const res = await fetch('/api/numbers', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    if (res.ok) {
+      const data = await res.json()
+      if (data.numbers && data.numbers.length > 0) {
+        for (let i = 0; i < Math.min(data.numbers.length, 5); i++) {
+          const n = data.numbers[i]
+          groups[i].redBalls = n.red.map(String)
+          groups[i].blueBall = String(n.blue)
+        }
+        originalNumbers.value = JSON.parse(JSON.stringify(groups))
+        saveStatus.value = '已加载云端数据'
+        setTimeout(() => saveStatus.value = '', 2000)
+      }
+    }
+  } catch (err) {
+    console.error('加载号码组失败:', err)
+  }
+}
+
+async function saveNumbers() {
+  if (!currentUser.value) return
+  
+  const token = localStorage.getItem('token')
+  const validGroups = groups.filter(g => {
+    const reds = parseNumberArray(g.redBalls)
+    const blue = parseInt(g.blueBall)
+    return reds.length === 6 && !isNaN(blue)
+  })
+
+  if (validGroups.length === 0) {
+    alert('没有可保存的有效号码组')
+    return
+  }
+
+  isSaving.value = true
+  try {
+    const res = await fetch('/api/numbers', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        numbers: validGroups.map(g => ({
+          red: parseNumberArray(g.redBalls),
+          blue: parseInt(g.blueBall),
+        })),
+      }),
+    })
+
+    if (res.ok) {
+      saveStatus.value = '已保存'
+      hasChanges.value = false
+      originalNumbers.value = JSON.parse(JSON.stringify(groups))
+      setTimeout(() => saveStatus.value = '', 2000)
+    } else {
+      alert('保存失败，请重试')
+    }
+  } catch (err) {
+    console.error('保存号码组失败:', err)
+    alert('保存失败')
+  } finally {
+    isSaving.value = false
+  }
+}
+
+function handleLogout() {
+  localStorage.removeItem('token')
+  localStorage.removeItem('user')
+  currentUser.value = null
+  window.location.href = '/'
+}
 
 function onPeriodChange() {
   resultStore.reset()
@@ -205,6 +317,28 @@ async function handleSubmit() {
   const drawNumbers = parseDrawNumbers()
   await resultStore.submitCompare(validNumbers, drawNumbers)
 }
+
+watch(groups, () => {
+  if (currentUser.value) {
+    const current = JSON.stringify(groups)
+    const original = JSON.stringify(originalNumbers.value)
+    hasChanges.value = current !== original
+  }
+}, { deep: true })
+
+onMounted(async () => {
+  await resultStore.fetchPeriods()
+  await checkAuth()
+})
+
+watch(selectedPeriod, (newVal) => {
+  if (newVal && !useCustomDraw.value) {
+    for (let i = 0; i < 6; i++) {
+      drawRedBalls[i] = String(newVal.red[i])
+    }
+    drawBlueBall.value = String(newVal.blue)
+  }
+}, { immediate: true })
 </script>
 
 <style scoped>
@@ -214,12 +348,68 @@ async function handleSubmit() {
   padding: 16px 12px;
 }
 
+.header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
 .page-title {
-  text-align: center;
   font-size: 22px;
   font-weight: 700;
   color: #e53935;
-  margin-bottom: 20px;
+  margin: 0;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.user-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+}
+
+.user-name {
+  font-size: 14px;
+  color: #333;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.btn-logout {
+  padding: 4px 12px;
+  font-size: 12px;
+  background: #f5f5f5;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.btn-logout:hover {
+  background: #eee;
+}
+
+.btn-login {
+  padding: 6px 16px;
+  background: #e53935;
+  color: white;
+  text-decoration: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.btn-login:hover {
+  background: #c62828;
 }
 
 .section {
@@ -253,7 +443,8 @@ async function handleSubmit() {
   margin-bottom: 12px;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .section-title::before {
@@ -263,6 +454,41 @@ async function handleSubmit() {
   height: 16px;
   background: #e53935;
   border-radius: 1px;
+}
+
+.save-status {
+  font-size: 12px;
+  color: #4caf50;
+  font-weight: normal;
+}
+
+.btn-save {
+  padding: 4px 12px;
+  font-size: 12px;
+  background: #4caf50;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.btn-save:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.login-hint {
+  font-size: 13px;
+  color: #666;
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  background: #f8f9fa;
+  border-radius: 6px;
+}
+
+.login-hint a {
+  color: #e53935;
+  font-weight: 500;
 }
 
 select {
@@ -451,6 +677,11 @@ select:focus {
 @media (max-width: 480px) {
   .home {
     padding: 12px 10px;
+  }
+
+  .header-row {
+    flex-direction: column;
+    align-items: flex-start;
   }
 
   .page-title {
