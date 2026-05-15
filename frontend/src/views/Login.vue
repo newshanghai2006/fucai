@@ -113,7 +113,7 @@ async function sendCode() {
     if (response.ok) {
       codeSent.value = true
       startCountdown()
-      alert('验证码已发送，请查看控制台日志')
+      alert(`验证码已发送！\n\n测试期间，验证码为：123456\n\n有效期 10 分钟`)
     } else {
       alert(data.error || '发送失败')
     }

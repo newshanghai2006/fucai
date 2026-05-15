@@ -1,3 +1,4 @@
+const nodemailer = require('nodemailer');
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const { getConnection } = require('../db/connection');
@@ -7,6 +8,16 @@ const TOKEN_EXPIRY_DAYS = 30;
 const CODE_EXPIRY_MINUTES = 10;
 
 const verificationCodes = new Map();
+
+const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST || 'smtp.163.com',
+  port: parseInt(process.env.SMTP_PORT || '465'),
+  secure: true,
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
+  },
+});
 
 function generateCode() {
   return Math.floor(100000 + Math.random() * 900000).toString();
@@ -31,7 +42,38 @@ function verifyToken(token) {
   }
 }
 
-function requestVerificationCode(email) {
+async function sendEmail(email, code) {
+  const mailOptions = {
+    from: process.env.SMTP_FROM || 'tomida2026@163.com',
+    to: email,
+    subject: '【双色球中奖检查器】验证码',
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #e53935;">双色球中奖检查器</h2>
+        <p>您好！</p>
+        <p>您正在登录双色球中奖检查器，验证码如下：</p>
+        <div style="background: #f5f5f5; padding: 20px; text-align: center; margin: 20px 0; border-radius: 8px;">
+          <span style="font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #e53935;">${code}</span>
+        </div>
+        <p>验证码有效期为 <strong>10 分钟</strong>，请尽快使用。</p>
+        <p style="color: #666; font-size: 14px;">如果这不是您本人的操作，请忽略此邮件。</p>
+        <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;" />
+        <p style="color: #999; font-size: 12px;">此邮件由系统自动发送，请勿回复。</p>
+      </div>
+    `,
+  };
+
+  try {
+    const info = await transporter.sendMail(mailOptions);
+    console.log(`邮件已发送到 ${email}: ${info.messageId}`);
+    return true;
+  } catch (err) {
+    console.error('邮件发送失败:', err);
+    return false;
+  }
+}
+
+async function requestVerificationCode(email) {
   const code = generateCode();
   const expiry = Date.now() + CODE_EXPIRY_MINUTES * 60 * 1000;
   
@@ -41,12 +83,24 @@ function requestVerificationCode(email) {
     attempts: 0,
   });
   
-  console.log(`【验证码】${email} 的验证码是：${code}（有效期${CODE_EXPIRY_MINUTES}分钟）`);
+  // 尝试发送邮件
+  const emailSuccess = await sendEmail(email, code);
   
-  return {
-    success: true,
-    message: `验证码已发送，有效期${CODE_EXPIRY_MINUTES}分钟`,
-  };
+  // 同时输出到日志（开发和测试用）
+  console.log(`\n【验证码】${email} 的验证码是：${code}（有效期${CODE_EXPIRY_MINUTES}分钟）\n`);
+  
+  if (emailSuccess) {
+    return {
+      success: true,
+      message: `验证码已发送到 ${email}，有效期${CODE_EXPIRY_MINUTES}分钟`,
+    };
+  } else {
+    // 邮件发送失败时，仍然允许使用日志中的验证码登录（测试模式）
+    return {
+      success: true,
+      message: `测试模式：请使用日志中的验证码（邮箱发送失败）`,
+    };
+  }
 }
 
 function verifyCode(email, inputCode) {
