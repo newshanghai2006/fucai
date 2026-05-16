@@ -206,14 +206,18 @@ async function checkAuth() {
 
 async function loadUserNumbers() {
   const token = localStorage.getItem('token')
+  console.log('[loadUserNumbers] token:', !!token, 'currentUser:', !!currentUser.value)
   if (!token || !currentUser.value) return
   
   try {
+    console.log('[loadUserNumbers] fetching /api/numbers...')
     const res = await fetch('/api/numbers', {
       headers: { Authorization: `Bearer ${token}` },
     })
+    console.log('[loadUserNumbers] response status:', res.status)
     if (res.ok) {
       const data = await res.json()
+      console.log('[loadUserNumbers] data:', data)
       if (data.numbers && data.numbers.length > 0) {
         for (let i = 0; i < Math.min(data.numbers.length, 5); i++) {
           const n = data.numbers[i]
@@ -233,12 +237,14 @@ async function loadUserNumbers() {
 async function saveNumbers() {
   if (!currentUser.value) return
   
+  console.log('[saveNumbers] user:', currentUser.value)
   const token = localStorage.getItem('token')
   const validGroups = groups.filter(g => {
     const reds = parseNumberArray(g.redBalls)
     const blue = parseInt(g.blueBall)
     return reds.length === 6 && !isNaN(blue)
   })
+  console.log('[saveNumbers] validGroups:', validGroups.length)
 
   if (validGroups.length === 0) {
     alert('没有可保存的有效号码组')
@@ -261,6 +267,7 @@ async function saveNumbers() {
       }),
     })
 
+    console.log('[saveNumbers] response status:', res.status)
     if (res.ok) {
       saveStatus.value = '已保存'
       hasChanges.value = false

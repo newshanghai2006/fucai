@@ -3,7 +3,6 @@
     <header class="app-header">
       <div class="header-inner">
         <span class="header-brand">双色球</span>
-        <LoginPanel />
       </div>
     </header>
     <main class="app-main">
@@ -13,7 +12,6 @@
 </template>
 
 <script setup>
-import LoginPanel from './components/LoginPanel.vue'
 </script>
 
 <style scoped>
